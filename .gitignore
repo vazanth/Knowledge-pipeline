@@ -1,0 +1,4 @@
+config
+pipeline.db
+__pycache__
+venv
