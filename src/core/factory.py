@@ -2,6 +2,7 @@ from adapters.extractors.jina_client import JinaExtractorClient
 from adapters.llm.gemini_client import GeminiClient
 from adapters.llm.ollama_client import OllamaClient
 from adapters.retrieval.tavily_client import TavilyRetrievalClient
+from processing.indexing_engine import IndexingEngine
 from settings.settings import Settings
 from core.container import AppContainer
 from processing.researcher import Researcher
@@ -13,6 +14,7 @@ from storage.obsidian import ObsidianManager
 class AppFactory:
     @staticmethod
     def create(settings: Settings) -> AppContainer:
+
         db = DatabaseManager(str(settings.sqlite_db_path))
 
         default_llm_client = OllamaClient(model="gemma4:e2b")
@@ -32,10 +34,14 @@ class AppFactory:
             default_llm_client=default_llm_client, gemini_llm_client=gemini_llm_client
         )
 
-        obsidian = ObsidianManager(vault_path=settings.vault_path)
+        indexing_engine = ""
+
+        obsidian = ObsidianManager(
+            indexing_engine=indexing_engine, vault_path=settings.vault_path
+        )
 
         return AppContainer(
-            token="",
+            token=settings.telegram_token,
             default_llm_client=default_llm_client,
             gemini_llm_client=gemini_llm_client,
             summarizer=summarizer,
