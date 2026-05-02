@@ -18,12 +18,12 @@ from utils.constants import (
 
 
 class DatabaseManager:
-    def __init__(self, db_path: str):
-        self.db_path = db_path
+    def __init__(self, sqlite_db_path: str):
+        self.sqlite_db_path = sqlite_db_path
         self.db: Connection | None = None
 
     async def connect(self):
-        self.db = await connect(self.db_path)
+        self.db = await connect(self.sqlite_db_path)
         self.db.row_factory = Row
         return self
 
@@ -50,7 +50,7 @@ class DatabaseManager:
             raise DatabaseError("Something went wrong")
 
     async def initialize_database(self):
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.sqlite_db_path), exist_ok=True)
 
         await self.connect()
 
@@ -58,7 +58,7 @@ class DatabaseManager:
         await self.execute(CREATE_CONTENT_TABLE, True, ())
         await self.execute(CREATE_SUMMARY_TABLE, True, ())
 
-        print(f"✅ Database is initialized succesfully at {self.db_path} 💯")
+        print(f"✅ Database is initialized succesfully at {self.sqlite_db_path} 💯")
 
     async def create_source(self, name: str, platform_type: str, platform_id: str):
         await self.execute(

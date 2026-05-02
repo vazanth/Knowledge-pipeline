@@ -1,9 +1,9 @@
 from asyncio.exceptions import CancelledError
-import os
 from pathlib import Path
 import asyncio, sys, logging
 from datetime import datetime, timezone, timedelta
 from typing import cast
+from core.container import AppContainer
 from telegram import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -51,16 +51,12 @@ def get_callback_query(update) -> CallbackQuery:
 
 
 class KnowledgeBot:
-    def __init__(
-        self, token, db, summarizer, researcher, llm_client, obsidian, adapter
-    ):
-        self.token = token
-        self.db = db
-        self.summarizer = summarizer
-        self.researcher = researcher
-        self.llm_client = llm_client
-        self.obsidian = obsidian
-        self.adapter = adapter
+    def __init__(self, container: AppContainer):
+        self.token = container.token
+        self.db = container.db
+        self.summarizer = container.summarizer
+        self.researcher = container.researcher
+        self.obsidian = container.obsidian
         self._research_cache = {}
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
