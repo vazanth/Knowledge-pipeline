@@ -30,12 +30,6 @@ An intelligent "Second Brain" assistant that autonomously collects, synthesizes,
 - `src/adapters/`: External API clients (Tavily, Jina, Gemini).
 - `src/storage/`: Database and Obsidian filesystem managers.
 
-## 📅 Roadmap: Phase 3 (In Progress)
-- [ ] **RAG (Retrieval-Augmented Generation)**: Chat with your research vault via `/ask`.
-- [ ] **Vector Search**: Local semantic search powered by **ChromaDB**.
-- [ ] **Conversational Memory**: Follow-up questions for deep-dive discussions.
-- [ ] **Auto-Indexing**: Seamless indexing of existing research on startup.
-
 ## 📊 Example Research Output
 Every research task generates a structured Markdown file with frontmatter, categorical analysis, and verified sources:
 
