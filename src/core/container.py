@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Any
 
+from processing import indexing_engine
+
 
 @dataclass
 class AppContainer:
@@ -11,3 +13,4 @@ class AppContainer:
     researcher: Any
     db: Any
     obsidian: Any
+    indexing_engine: Any

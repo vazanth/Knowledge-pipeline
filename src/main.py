@@ -1,3 +1,4 @@
+import asyncio
 from settings.load_settings import load_settings
 from core.factory import AppFactory
 from bot.knowledge_bot import KnowledgeBot
@@ -11,6 +12,12 @@ def start_app():
         return
 
     container = AppFactory.create(config)
+
+    print("🚀 Initializing Vector Database...")
+
+    asyncio.run(container.indexing_engine.index_all(config.vault_path))
+
+    print("🚀 RAG Sync completed 🔄️...")
 
     bot = KnowledgeBot(container)
 

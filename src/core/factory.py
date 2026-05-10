@@ -1,3 +1,4 @@
+from storage.vector_store import VectorStore
 from adapters.extractors.jina_client import JinaExtractorClient
 from adapters.llm.gemini_client import GeminiClient
 from adapters.llm.ollama_client import OllamaClient
@@ -34,7 +35,9 @@ class AppFactory:
             default_llm_client=default_llm_client, gemini_llm_client=gemini_llm_client
         )
 
-        indexing_engine = ""
+        vector_store = VectorStore(chroma_db_path=settings.chroma_db_path)
+
+        indexing_engine = IndexingEngine(vector_store=vector_store)
 
         obsidian = ObsidianManager(
             indexing_engine=indexing_engine, vault_path=settings.vault_path
@@ -48,4 +51,5 @@ class AppFactory:
             researcher=researcher,
             db=db,
             obsidian=obsidian,
+            indexing_engine=indexing_engine,
         )
