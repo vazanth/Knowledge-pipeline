@@ -1,24 +1,19 @@
 from asyncio.exceptions import CancelledError
-import os
 from pathlib import Path
-import asyncio, sys, logging
+import asyncio, logging
 from datetime import datetime, timezone, timedelta
-from typing import cast
+
 from telegram import (
-    CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    CallbackQuery,
     Update,
 )
-from telegram.ext import (
-    ApplicationBuilder,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-)
+from telegram.ext import ContextTypes
 
 from adapters.sources.youtube import YoutubeAdapter
+from bot.ui_helpers import get_message, get_callback_query, create_rolling_loader
 from utils.constants import (
     ADD_SOURCE_ERROR,
     ADD_SOURCE_SUCCESS,
@@ -33,35 +28,18 @@ from utils.constants import (
     WELCOME_MESSAGE,
 )
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-
-for logger_name in ["httpx", "httpcore", "telegram", "apscheduler"]:
-    logging.getLogger(logger_name).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-def get_message(update) -> Message:
-    return cast(Message, update.message)
-
-
-def get_callback_query(update) -> CallbackQuery:
-    return cast(CallbackQuery, update.callback_query)
-
-
-class KnowledgeBot:
-    def __init__(
-        self, token, db, summarizer, researcher, llm_client, obsidian, adapter
-    ):
-        self.token = token
+class BotHandlers:
+    def __init__(self, db, summarizer, researcher, obsidian):
         self.db = db
         self.summarizer = summarizer
         self.researcher = researcher
-        self.llm_client = llm_client
         self.obsidian = obsidian
-        self.adapter = adapter
         self._research_cache = {}
+
+    # ─── Command Handlers ─────────────────────────────────────────
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handler for the start command"""
@@ -150,7 +128,9 @@ class KnowledgeBot:
 
             task = asyncio.create_task(progress_updater())
             try:
-                summary, strategy = await self.summarizer.run_pipeline(item.content)
+                summary, strategy = await self.summarizer.run_pipeline(
+                    item.content, "transcript"
+                )
 
                 content_id = await self.db.create_content(
                     source_id=item.source_id,
@@ -192,17 +172,7 @@ class KnowledgeBot:
 
         await status_msg.edit_text(ALL_CAUGHT_UP)
 
-    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        logging.error("Exception while handling an update:", exc_info=context.error)
-
-        try:
-            if update and update.effective_message:
-                await update.effective_message.reply_text(
-                    "😅 Oops, something broke on my end.\nGive it another try in a bit!"
-                )
-        except Exception as e:
-            print(f"error: {e}")
-            sys.exit(1)
+    # ─── Callback Handlers ────────────────────────────────────────
 
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query: CallbackQuery = get_callback_query(update)
@@ -250,6 +220,8 @@ class KnowledgeBot:
                     caption="📚 Here's your research report!",
                 )
 
+    # ─── Pipeline Logic ───────────────────────────────────────────
+
     async def run_research_pipeline(self, query, callback_payload):
         content_id = int(callback_payload[1])
 
@@ -269,7 +241,7 @@ class KnowledgeBot:
                 )
             except CancelledError:
                 raise
-            except:
+            except Exception:
                 pass
 
         await ui_update(f"📊 Insights for content `{content_id}`\n\nComing soon...")
@@ -288,7 +260,7 @@ class KnowledgeBot:
             "✍️ Typing something brilliant...",
             "🎉 Wrapping it up for you...",
         ]
-        loader = await self._create_rolling_loader(ui_update, steps)
+        loader = await create_rolling_loader(ui_update, steps)
 
         scraped_data, source_urls = await self.researcher.run_pipeline(
             summary_text, ui_update
@@ -389,46 +361,3 @@ class KnowledgeBot:
         await ui_update(f"📑 Research saved to your vault!\n📍 {file_path}")
 
         return file_path
-
-    async def _create_rolling_loader(self, ui_update, steps, interval=20):
-        async def _roller():
-            i = 0
-            while True:
-                await asyncio.sleep(interval)
-                try:
-                    await ui_update(steps[i % len(steps)])
-                    i += 1
-                except:
-                    pass
-
-        return asyncio.create_task(_roller())
-
-    async def post_init(self, application):
-        """This runs INSIDE the bot's engine room."""
-        await self.db.initialize_database()
-        print("✅ Database initialized inside the Bot loop.")
-
-    async def post_shutdown(self, application):
-        await self.db.close()
-        logger.info("🔒 Database connection closed cleanly.")
-
-    def run(self):
-        """This is the method you call from main.py"""
-        app = (
-            ApplicationBuilder()
-            .token(self.token)
-            .post_init(self.post_init)
-            .post_shutdown(self.post_shutdown)
-            .build()
-        )
-
-        # Add your handlers...
-        app.add_handler(CommandHandler("start", self.start))
-        app.add_handler(CommandHandler("add_source", self.add_source))
-        app.add_handler(CommandHandler("latest", self.latest))
-        app.add_handler(CommandHandler("sources", self.sources))
-        app.add_handler(CallbackQueryHandler(self.handle_callback))
-        app.add_error_handler(self.error_handler)  # type: ignore
-
-        print("🚀 Bot is polling...")
-        app.run_polling()

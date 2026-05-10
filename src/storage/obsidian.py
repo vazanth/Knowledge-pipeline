@@ -5,7 +5,8 @@ import re
 
 class ObsidianManager:
 
-    def __init__(self, vault_path: str) -> None:
+    def __init__(self, indexing_engine, vault_path: str) -> None:
+        self.indexing_engine = indexing_engine
         self.vault_path = vault_path
         self.directory = os.path.join(self.vault_path, "KnowledgePipeline", "Research")
         os.makedirs(self.directory, exist_ok=True)
@@ -30,5 +31,7 @@ class ObsidianManager:
 
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(frontmatter + content)
+
+        await self.indexing_engine.index_file(file_path)
 
         return file_path

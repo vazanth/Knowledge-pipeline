@@ -19,7 +19,7 @@ class Summarizer:
         self.gemini_llm_client = gemini_llm_client
         self.semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
 
-    async def run_pipeline(self, transcript) -> tuple[str, str]:
+    async def run_pipeline(self, transcript, setting) -> tuple[str, str]:
         limit = 5000
 
         total_token = token_len(transcript)
@@ -29,7 +29,7 @@ class Summarizer:
             return (final_summary, "stuff")
         else:
             # chunking
-            chunks = get_chunks(transcript)
+            chunks = get_chunks(transcript, setting)
             # map step
             partial_summaries = []
             for chunk in chunks:
@@ -65,7 +65,7 @@ class Summarizer:
         async with self.semaphore:
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    summary, strategy = await self.run_pipeline(text)
+                    summary, strategy = await self.run_pipeline(text, "scraped")
                     return summary
                 except Exception as e:
                     if attempt < MAX_RETRIES:
