@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 
 
 def load_settings() -> Settings:
-    root_path = Path(__file__).parent.parent
+    root_path = Path(__file__).parent.parent.parent
 
-    env_path = root_path.parent / ".env"
+    env_path = root_path / ".env"
 
     print(f"rootpath {root_path}")
     print(f"env_path {env_path.resolve()}")

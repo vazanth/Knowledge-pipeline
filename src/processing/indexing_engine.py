@@ -1,7 +1,5 @@
-import asyncio
 import os
 from pathlib import Path
-import requests
 import yaml
 import re
 from processing.chunk import get_chunks
@@ -9,25 +7,33 @@ from processing.chunk import get_chunks
 
 class IndexingEngine:
 
-    def __init__(self, vector_store, embedding_model="default"):
+    def __init__(self, vector_store, embedding_engine):
         self.vector_store = vector_store
-        self.embedding_model = embedding_model
+        self.embedding_engine = embedding_engine
 
     async def index_file(self, file_path):
         text = self.read_file(file_path)
         metadata, text = self.extract_frontmatter(text)
 
+        clean_metadata = {}
         for key, value in metadata.items():
-            if isinstance(value, list):
-                metadata[key] = ", ".join(value)
+            if isinstance(value, (str, int, float, bool)):
+                clean_metadata[key] = value
+            elif isinstance(value, list):
+                clean_metadata[key] = ", ".join(map(str, value))
+            else:
+                clean_metadata[key] = str(value)
+
+        if "source" not in clean_metadata:
+            clean_metadata["source"] = Path(file_path).name
 
         chunks = get_chunks(text, "markdown")
 
         ids = [f"{Path(file_path).name}_{i}" for i in range(len(chunks))]
 
-        chunk_metadatas = [metadata for _ in chunks]
+        chunk_metadatas = [clean_metadata for _ in chunks]
 
-        embeddings = await self.get_embeddings(chunks)
+        embeddings = await self.embedding_engine.get_embeddings(chunks)
 
         await self.vector_store.upsert(
             "EmbeddingGemma", ids, chunks, embeddings, chunk_metadatas
@@ -60,44 +66,3 @@ class IndexingEngine:
             return metadata, content
 
         return {}, text
-
-    async def get_embeddings(self, chunks):
-        semaphore = asyncio.Semaphore(10)
-
-        if self.embedding_model == "nomic-embed-text":
-            semaphore = asyncio.Semaphore(10)
-
-            async def embedNomic(c):
-                async with semaphore:
-                    res = await asyncio.to_thread(
-                        requests.post,
-                        "http://localhost:11434/api/embeddings",
-                        json={"model": "nomic-embed-text", "prompt": c},
-                    )
-
-                    data = res.json()
-                    emb = data["embedding"]
-
-                    return emb[0] if isinstance(emb[0], list) else emb
-
-            tasks = [embedNomic(c) for c in chunks]
-            return await asyncio.gather(*tasks)
-
-        else:
-            semaphore = asyncio.Semaphore(10)
-
-            async def embedGemma(c):
-                async with semaphore:
-                    res = await asyncio.to_thread(
-                        requests.post,
-                        "http://localhost:11434/api/embeddings",
-                        json={"model": "EmbeddingGemma", "prompt": c},
-                    )
-
-                    data = res.json()
-                    emb = data["embedding"]
-
-                    return emb[0] if isinstance(emb[0], list) else emb
-
-            tasks = [embedGemma(c) for c in chunks]
-            return await asyncio.gather(*tasks)

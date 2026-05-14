@@ -19,6 +19,7 @@ from utils.constants import (
     ADD_SOURCE_SUCCESS,
     ALL_CAUGHT_UP,
     GENERIC_ERROR,
+    QUERY_ERROR,
     SOURCES_EMPTY,
     SOURCES_LIST,
     UPDATE_FOUND,
@@ -32,11 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 class BotHandlers:
-    def __init__(self, db, summarizer, researcher, obsidian):
+    def __init__(self, db, summarizer, researcher, obsidian, rag_engine):
         self.db = db
         self.summarizer = summarizer
         self.researcher = researcher
         self.obsidian = obsidian
+        self.rag_engine = rag_engine
         self._research_cache = {}
 
     # ─── Command Handlers ─────────────────────────────────────────
@@ -171,6 +173,30 @@ class BotHandlers:
                     pass
 
         await status_msg.edit_text(ALL_CAUGHT_UP)
+
+    async def query(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handler for /query <question>"""
+        msg = get_message(update)
+
+        if not context.args or len(context.args) < 2:
+            await msg.reply_text(QUERY_ERROR)
+            return
+
+        status_msg = await msg.reply_text("🔎 Searching your vault...")
+
+        query = " ".join(context.args[0:])
+
+        try:
+            response = await self.rag_engine.run_pipeline(query)
+            try:
+                # 1. Try sending with Markdown
+                await status_msg.edit_text(response, parse_mode="Markdown")
+            except Exception:
+                # 2. If Markdown fails, send as plain text
+                await status_msg.edit_text(response)
+        except Exception as e:
+            # 3. If the RAG Engine itself fails
+            await status_msg.edit_text(f"❌ RAG Error: {str(e)}")
 
     # ─── Callback Handlers ────────────────────────────────────────
 

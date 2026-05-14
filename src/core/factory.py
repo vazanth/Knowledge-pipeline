@@ -1,3 +1,5 @@
+from processing.embedding_engine import EmbeddingEngine
+from processing.rag_engine import RagEngine
 from storage.vector_store import VectorStore
 from adapters.extractors.jina_client import JinaExtractorClient
 from adapters.llm.gemini_client import GeminiClient
@@ -37,10 +39,20 @@ class AppFactory:
 
         vector_store = VectorStore(chroma_db_path=settings.chroma_db_path)
 
-        indexing_engine = IndexingEngine(vector_store=vector_store)
+        embedding_engine = EmbeddingEngine()
+
+        indexing_engine = IndexingEngine(
+            vector_store=vector_store, embedding_engine=embedding_engine
+        )
 
         obsidian = ObsidianManager(
             indexing_engine=indexing_engine, vault_path=settings.vault_path
+        )
+
+        rag_engine = RagEngine(
+            vector_store=vector_store,
+            embedding_engine=embedding_engine,
+            gemini_llm_client=gemini_llm_client,
         )
 
         return AppContainer(
@@ -52,4 +64,6 @@ class AppFactory:
             db=db,
             obsidian=obsidian,
             indexing_engine=indexing_engine,
+            embedding_engine=embedding_engine,
+            rag_engine=rag_engine,
         )

@@ -27,6 +27,7 @@ class KnowledgeBot:
             summarizer=container.summarizer,
             researcher=container.researcher,
             obsidian=container.obsidian,
+            rag_engine=container.rag_engine,
         )
 
     # ─── Lifecycle Hooks ──────────────────────────────────────────
@@ -69,7 +70,7 @@ class KnowledgeBot:
         app.add_handler(CommandHandler("add_source", self.handlers.add_source))
         app.add_handler(CommandHandler("latest", self.handlers.latest))
         app.add_handler(CommandHandler("sources", self.handlers.sources))
-        # app.add_handler(CommandHandler("ask", self.handlers.ask))
+        app.add_handler(CommandHandler("query", self.handlers.query))
 
         # Callback & error handlers
         app.add_handler(CallbackQueryHandler(self.handlers.handle_callback))
