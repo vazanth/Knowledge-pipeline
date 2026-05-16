@@ -104,7 +104,16 @@ WELCOME_MESSAGE = """🤖 Hey! I'm your Knowledge Bot 📚
     ➕ /add_source – Add a YouTube channel or blog
     📌 /sources – View your saved sources
     🆕 /latest – Get the newest updates instantly
+    💬/query - To start chatting with your bot
     Just add your favorite sources and I'll handle the rest 🚀"""
+
+HANDLERS_AVAILABLE = """
+    To initiate a conversation please use any one of the below
+    ➕ /add_source – Add a YouTube channel or blog
+    📌 /sources – View your saved sources
+    🆕 /latest – Get the newest updates instantly
+    💬/query - To start chatting with your bot
+"""
 
 ADD_SOURCE_ERROR = "❌ Oops! Use it like this:\n/add_source <platform_id> <name>"
 
@@ -125,6 +134,8 @@ UPDATES_EMPTY = "📭 No new content right now.\nCheck back later or add more so
 UPDATE_FOUND = "📡 Found {count} new item(s)! Processing... ⚡"
 
 ALL_CAUGHT_UP = "✅ All caught up! You're up to date 🎉"
+
+CHAT_SESSION_END = "🧹 **Session Cleared.**\n*Memory wiped. Ready for a new topic!*"
 
 GENERIC_ERROR = "❌ Oops! Something went wrong"
 
@@ -266,10 +277,13 @@ RAG_PROMPT = """
 You are a technical research assistant with access to the user's personal knowledge vault.
 The vault contains research notes on software engineering topics — AI, system design, databases, DevOps, and frontend.
 
-CONTEXT:
+CONVERSATION HISTORY:
+{history}
+
+CONTEXT FROM YOUR VAULT:
 {context}
 
-QUESTION:
+USER QUESTION:
 {query}
 
 ANSWERING RULES:
@@ -292,10 +306,54 @@ FORMAT RULES:
 - If quoting directly from a note use > blockquote format
 - When answering from vault, cite the source at the end as: Source: Note Title
 - When answering from general knowledge, do not cite a source
+- Keep your entire answer under 2500 characters — be dense, not exhaustive
+- If a topic needs more depth, cover the core mechanism only and let the suggested questions go deeper
 
 STRICT RULES:
 - Never mix vault content and general knowledge without clearly separating them
 - Never present general knowledge as if it came from the vault
 - Never speculate — if genuinely uncertain even from general knowledge, say so
 - Any technical terms, variable names, or file names containing underscores (_) MUST be wrapped in `backticks`.
+
+SUGGESTED QUESTIONS RULES:
+- After your answer, always append exactly: |||
+- Then provide exactly 3 follow-up questions on new lines
+- Questions must be technically deeper than the current question — not restatements
+- Questions must be relevant to the current topic and conversation history
+- Do not number with dots — use plain numbers: 1. 2. 3.
+- Do not add any text after the 3 questions
+- Each question must be under 40 characters — they render as Telegram buttons
+- Use short, specific phrases not full sentences
+- Good: "How does FAISS indexing work?"
+- Bad: "Can you explain how FAISS handles indexing at scale in production?"
+
+OUTPUT STRUCTURE:
+[Your answer here]
+|||
+1. [Follow-up question]
+2. [Follow-up question]
+3. [Follow-up question]
+"""
+
+CONDENSE_QUERY_PROMPT = """
+You are a search query optimizer for a personal software engineering knowledge vault.
+The vault contains research notes on AI, system design, databases, DevOps, and frontend topics.
+
+Your job is to rephrase the follow-up question into a precise standalone search query
+that captures full context from the chat history — without needing the history to make sense.
+
+RULES:
+- Preserve exact technical terms from both the history and the follow-up question
+- Expand pronouns and references — "how does it work?" → "how does [specific topic] work?"
+- If the follow-up is already standalone and specific, return it as-is — do not rephrase unnecessarily
+- Do not add assumptions or details not present in the history or follow-up
+- Output only the standalone question — no explanation, no preamble
+
+CHAT HISTORY:
+{chat_history}
+
+FOLLOW UP QUESTION:
+{question}
+
+STANDALONE QUESTION:
 """

@@ -6,6 +6,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
+    MessageHandler,
+    filters,
 )
 from bot.handlers import BotHandlers
 
@@ -71,6 +73,10 @@ class KnowledgeBot:
         app.add_handler(CommandHandler("latest", self.handlers.latest))
         app.add_handler(CommandHandler("sources", self.handlers.sources))
         app.add_handler(CommandHandler("query", self.handlers.query))
+        app.add_handler(CommandHandler("reset", self.handlers.reset))
+        app.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.handlers.chat)
+        )
 
         # Callback & error handlers
         app.add_handler(CallbackQueryHandler(self.handlers.handle_callback))

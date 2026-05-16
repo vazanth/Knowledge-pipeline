@@ -1,3 +1,4 @@
+from collections import deque
 from asyncio.exceptions import CancelledError
 from pathlib import Path
 import asyncio, logging
@@ -18,6 +19,7 @@ from utils.constants import (
     ADD_SOURCE_ERROR,
     ADD_SOURCE_SUCCESS,
     ALL_CAUGHT_UP,
+    CHAT_SESSION_END,
     GENERIC_ERROR,
     QUERY_ERROR,
     SOURCES_EMPTY,
@@ -27,6 +29,7 @@ from utils.constants import (
     UPDATES_EMPTY,
     UPDATES_LOADING,
     WELCOME_MESSAGE,
+    HANDLERS_AVAILABLE,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +43,7 @@ class BotHandlers:
         self.obsidian = obsidian
         self.rag_engine = rag_engine
         self._research_cache = {}
+        self.user_sessions = {}
 
     # ─── Command Handlers ─────────────────────────────────────────
 
@@ -176,27 +180,94 @@ class BotHandlers:
 
     async def query(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handler for /query <question>"""
+        user_id = self.fetch_user_id(update)
+
+        session = self.get_or_create_session(user_id)
+        session["mode"] = "query"
         msg = get_message(update)
 
         if not context.args or len(context.args) < 2:
             await msg.reply_text(QUERY_ERROR)
             return
 
+        query_text = " ".join(context.args[0:])
+        await self.process_rag_query(update, session, query_text)
+
+    async def chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handler for direct chat"""
+        msg = get_message(update)
+        if update.message is None:
+            return
+        user_id = self.fetch_user_id(update)
+        session = self.get_or_create_session(user_id)
+
+        if session.get("mode") != "query":
+            await msg.reply_text(HANDLERS_AVAILABLE)
+            return
+
+        query_text = update.message.text
+        await self.process_rag_query(update, session, query_text)
+
+    async def reset(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = self.fetch_user_id(update)
+
+        session = self.get_or_create_session(user_id)
+
+        session["mode"] = None
+        session["history"].clear()
+
+        msg = get_message(update)
+        await msg.reply_text(CHAT_SESSION_END, parse_mode="Markdown")
+
+    async def process_rag_query(self, update, session, query_text):
+        """Shared logic for RAG execution"""
+        msg = get_message(update)
         status_msg = await msg.reply_text("🔎 Searching your vault...")
+        user_id = self.fetch_user_id(update)
 
-        query = " ".join(context.args[0:])
-
+        session = self.get_or_create_session(user_id)
         try:
-            response = await self.rag_engine.run_pipeline(query)
+            # Note: We aren't passing history to rag_engine yet!
+            response = await self.rag_engine.run_pipeline(
+                query_text, session.get("history")
+            )
+            # Save to history
+            session["history"].append(
+                {"user": query_text, "assistant": response["answer"]}
+            )
+
+            buttons = []
+            emojis = ["💡", "💡", "🔭"]
+            for i, q in enumerate(response["suggestions"]):
+                emoji = emojis[i] if i < len(emojis) else "🔹"
+                buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            f"{emoji} {q}", callback_data=f"suggestion:{q}"[:64]
+                        )
+                    ]
+                )
+
+            reply_markup = InlineKeyboardMarkup(buttons) if buttons else None
+
             try:
-                # 1. Try sending with Markdown
-                await status_msg.edit_text(response, parse_mode="Markdown")
-            except Exception:
-                # 2. If Markdown fails, send as plain text
-                await status_msg.edit_text(response)
+                await status_msg.edit_text(
+                    response["answer"], reply_markup=reply_markup, parse_mode="Markdown"
+                )
+            except Exception as e:
+                await status_msg.edit_text(
+                    response["answer"], reply_markup=reply_markup
+                )
         except Exception as e:
-            # 3. If the RAG Engine itself fails
             await status_msg.edit_text(f"❌ RAG Error: {str(e)}")
+
+    def get_or_create_session(self, user_id):
+        if user_id not in self.user_sessions:
+            self.user_sessions[user_id] = {
+                "history": deque(maxlen=5),
+                "mode": "query",
+            }
+        return self.user_sessions[user_id]
 
     # ─── Callback Handlers ────────────────────────────────────────
 
@@ -218,7 +289,7 @@ class BotHandlers:
 
         if not query.data:
             return
-        callback_payload = query.data.split(":")
+        callback_payload = query.data.split(":", 1)
         action = callback_payload[0]
 
         if action == "research":
@@ -245,6 +316,20 @@ class BotHandlers:
                     filename=path.name,
                     caption="📚 Here's your research report!",
                 )
+
+        if action == "suggestion":
+            await query.edit_message_reply_markup(reply_markup=None)
+            suggested_query = callback_payload[1]
+
+            await query.message.reply_text(
+                f"👤 **{suggested_query}**", parse_mode="Markdown"
+            )
+
+            user_id = self.fetch_user_id(update)
+
+            session = self.get_or_create_session(user_id)
+
+            await self.process_rag_query(update, session, suggested_query)
 
     # ─── Pipeline Logic ───────────────────────────────────────────
 
@@ -387,3 +472,8 @@ class BotHandlers:
         await ui_update(f"📑 Research saved to your vault!\n📍 {file_path}")
 
         return file_path
+
+    def fetch_user_id(self, update: Update) -> int:
+        if update.effective_user is None:
+            return 0
+        return update.effective_user.id

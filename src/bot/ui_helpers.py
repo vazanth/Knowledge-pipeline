@@ -5,7 +5,10 @@ from telegram import CallbackQuery, Message
 
 
 def get_message(update) -> Message:
-    return cast(Message, update.message)
+    if update.message:
+        return cast(Message, update.message)
+    else:
+        return cast(Message, update.effective_message)
 
 
 def get_callback_query(update) -> CallbackQuery:
