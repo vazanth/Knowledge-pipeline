@@ -29,7 +29,11 @@ class RagEngine:
         sources_to_cite = set()
         best_distance = result["distances"][0][0] if result["distances"] else 2.0
 
-        if best_distance < 1.3:
+        print(
+            f"🧲📄 Distance: {best_distance} ({'MATCH_FOUND' if best_distance < 1.1 else 'NO RELEVANT CONTENT IN VAULT'})"
+        )
+
+        if best_distance < 1.1:
             for doc, meta in zip(result["documents"][0], result["metadatas"][0]):
                 source_url = meta.get("source", "Unknown")
                 source_title = meta.get("title", "Unknown Note")
@@ -55,12 +59,22 @@ class RagEngine:
             ]
             answer = llm_answer
 
+        # Fix: Don't staple citations if the LLM says the vault doesn't cover it
+        # (This happens if distance was < 1.3 but context was irrelevant)
+        if "⚠️" in answer or "vault doesn't cover" in answer.lower():
+            sources_to_cite = set()
+
         if sources_to_cite and "NO RELEVANT CONTENT" not in context:
-            citation_text = "\n\n📚 **Sources from your vault:**\n"
-            citation_text += "\n".join(
-                [f"• {url}" for url in sources_to_cite if url.startswith("http")]
+            # Format citations cleanly on individual lines
+            citation_block = "\n\n📍 **Sources from your vault:**\n"
+            sorted_sources = sorted(
+                [s for s in sources_to_cite if s.startswith("http")]
             )
-            answer += citation_text
+
+            for source in sorted_sources:
+                citation_block += f"• {source}\n"
+
+            answer += citation_block
 
         return {"answer": answer, "suggestions": suggestions[:3]}
 

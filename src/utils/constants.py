@@ -304,8 +304,6 @@ FORMAT RULES:
 - Use bullet points for multi-part answers
 - Use `inline code` for technical terms, APIs, configs, and commands
 - If quoting directly from a note use > blockquote format
-- When answering from vault, cite the source at the end as: Source: Note Title
-- When answering from general knowledge, do not cite a source
 - Keep your entire answer under 2500 characters — be dense, not exhaustive
 - If a topic needs more depth, cover the core mechanism only and let the suggested questions go deeper
 

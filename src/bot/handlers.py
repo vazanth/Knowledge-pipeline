@@ -252,14 +252,19 @@ class BotHandlers:
 
             try:
                 await status_msg.edit_text(
-                    response["answer"], reply_markup=reply_markup, parse_mode="Markdown"
+                    response["answer"], 
+                    reply_markup=reply_markup, 
+                    parse_mode="Markdown",
+                    disable_web_page_preview=True
                 )
             except Exception as e:
                 await status_msg.edit_text(
-                    response["answer"], reply_markup=reply_markup
+                    response["answer"], 
+                    reply_markup=reply_markup,
+                    disable_web_page_preview=True
                 )
         except Exception as e:
-            await status_msg.edit_text(f"❌ RAG Error: {str(e)}")
+            await status_msg.edit_text(f"❌ RAG Error: {str(e)}", disable_web_page_preview=True)
 
     def get_or_create_session(self, user_id):
         if user_id not in self.user_sessions:
